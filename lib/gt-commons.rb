@@ -6,6 +6,6 @@ module GT
 	end
 
 	def GT::nil_or_empty?(var)
-		var.nil? or var.empty?
+		var.nil? or var.to_s().empty?
 	end
 end

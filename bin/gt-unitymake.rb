@@ -7,7 +7,20 @@ require 'zip'
 
 umakefile = ARGV[0]
 
-require_relative 'dllbuilder'
+require_relative '../lib/gt-dllbuilder'
+require_relative 'gt-update-references'
+require_relative 'gt-genguid'
+require_relative 'gt-fileid'
+
+META_TEMPLATE = <<-eos
+fileFormatVersion: 2
+guid: _GUID_
+MonoAssemblyImporter:
+  serializedVersion: 1
+  iconMap: {}
+  executionOrder: {}
+  userData:  
+eos
 
 @references = {}
 
@@ -18,8 +31,13 @@ if umakefile.nil?
         exit 1
     end        
 elsif not File.exists? umakefile
-    puts "File not found: #{umakefile}"
-    exit 1
+    umakefile2 = umakefile + ".rb"
+    unless File.exists? umakefile2
+        puts "File not found: #{umakefile}"
+        exit 1
+    else
+        umakefile = umakefile2
+    end
 end
 
 require Dir.pwd + "/" + umakefile
@@ -103,6 +121,8 @@ def resolve_references(reference)
     elsif reference.is_a? String
         if @references.has_key? reference
             return @references[reference]
+        elsif File.exists? reference
+            return reference
         else
             raise "Reference not found: #{reference}"
         end
@@ -166,6 +186,29 @@ def zip(basedir, files, zipfile)
     end
 end
 
+def meta_file_of(file)
+    file + ".meta"
+end
+
+def guid_of(file)
+    contents = File.read(meta_file_of(file))
+    /guid: ([0-9a-f]{32})/.match(contents)[1]
+end
+
+def namespace_of(file)
+    contents = File.read(file)
+    md = /namespace ([^ {\^]+)/.match(contents)
+    unless md.nil?
+        md[1]
+    else
+        ""
+    end
+end
+
+def class_name_of(file)
+    File.basename(file, ".cs")
+end
+
 #
 # Compile bundles
 #
@@ -179,10 +222,10 @@ unless BUNDLES.nil? or BUNDLES.empty?
             output = entries[:output]
             puts "    Copying files"
             files = as_array(entries[:files])
-            files = resolve_files(files)
-            files = copy_files(files, tempdir)
+            srcfiles = resolve_files(files)
+            files = copy_files(srcfiles, tempdir)
 
-            puts "    Connecting references"
+            puts "    Connecting dependencies"
             references = as_array(entries[:references])
             references.push :UnityEngine
             references = resolve_references(references)
@@ -202,11 +245,41 @@ unless BUNDLES.nil? or BUNDLES.empty?
             builder.references = references
             builder.defines = as_array(entries[:defines])
 
-            puts "    Done"
-
             unless builder.build(output)
                 raise "Aborting due to previous errors."
             end
+
+            unless GT.nil_or_empty? entries[:guid]
+                puts "    Setting GUID #{entries[:guid]}"
+                File.open(output + ".meta", "w") { |f| f << META_TEMPLATE.gsub("_GUID_", entries[:guid]) }
+            end
+
+            if entries[:update_references]
+                puts "    Updating references"
+
+                srcfiles.each do |file|
+                    file_guid = guid_of(file)
+                    file_class_name = class_name_of(file)
+                    file_namespace = namespace_of(file)
+
+                    dll_guid = entries[:guid] || GT.gt-genguid()
+                    dll_fileid = GT.fileid(file_class_name, file_namespace)
+
+                    GT.update_references(entries[:rootdir], file_guid, dll_guid, 11500000, dll_fileid)
+                end
+                
+            end
+
+            if entries[:remove_sources]
+                puts "    Removing source files"
+
+                srcfiles.each do |file|
+                    File.unlink(file)
+                    File.unlink(meta_file_of(file))
+                end
+            end
+
+            puts "    Done"
 
             @references[name] = output
         rescue Exception => e

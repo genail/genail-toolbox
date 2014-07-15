@@ -9,9 +9,9 @@
 
 require 'openssl'
 
-module FileID
+module GT
 
-	def FileID::compute(class_name, namespace="")
+	def GT::fileid(class_name, namespace="")
 		s = "s\0\0\0" + namespace + class_name
 		OpenSSL::Digest.digest("MD4", s)[0..3].unpack('l<').first
 	end
@@ -28,5 +28,5 @@ if __FILE__ == $0
 		exit 1
 	end
 
-	puts FileID.compute(class_name, namespace)
+	puts GT.fileid(class_name, namespace)
 end

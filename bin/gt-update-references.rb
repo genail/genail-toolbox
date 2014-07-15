@@ -10,7 +10,7 @@
 require 'optparse'
 require 'pp'
 
-require_relative 'gt-commons'
+require_relative '../lib/gt-commons'
 
 module GT
     @@verbose = false
@@ -36,7 +36,7 @@ module GT
             replaced = contents.gsub("guid: #{from_guid}", "guid: #{to_guid}")
 
             unless GT.nil_or_empty? from_fileid and GT.nil_or_empty? to_fileid
-                replaced = replaced.gsub("fileID: #{from_fileid}", "fileID: #{to_fileID}")
+                replaced = replaced.gsub("fileID: #{from_fileid}, guid: #{to_guid}", "fileID: #{to_fileid}, guid: #{to_guid}")
             end
 
             if replaced != contents
@@ -45,8 +45,6 @@ module GT
                 File.open(file, "w") { |f| f << replaced }
             end
         end
-
-        puts "Finished. Updated #{updated_count} files."
     end
 
     def GT::collect_files(search_dir)
@@ -106,7 +104,9 @@ if __FILE__ == $0
         opts.on("-v", "--verbose", "Run verbosely") do |o|
             options[:verbose] = o
         end
-    end.parse!
+    end
+
+    op.parse!
 
     if options[:help]
         puts op.help
