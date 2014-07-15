@@ -257,10 +257,15 @@ unless BUNDLES.nil? or BUNDLES.empty?
             if entries[:update_references]
                 puts "    Updating references"
 
-                srcfiles.each do |file|
-                    file_guid = guid_of(file)
+                for i in 0..(srcfiles.length - 1) do
+                    srcfile = srcfiles[i]
+                    file = files[i]
+
+                    file_guid = guid_of(srcfile)
                     file_class_name = class_name_of(file)
                     file_namespace = namespace_of(file)
+
+                    puts "#{file_namespace}.#{file_class_name}"
 
                     dll_guid = entries[:guid] || GT.gt-genguid()
                     dll_fileid = GT.fileid(file_class_name, file_namespace)
