@@ -215,6 +215,38 @@ def class_name_of(file)
     File.basename(file, ".cs")
 end
 
+# using ilmerge
+# basedll - existing dll which will be merged and replaced
+# sourcedlls[] - existing dlls which will be merged and removed
+# dependencies[] - dependency paths
+def merge(basedll, sourcedlls, dependencies)
+    basedll2 = basedll.split(".")[0..-2].join(".") + "__." + basedll.split(".")[-1]
+    File.rename(basedll, basedll2)
+    cmd = "ilmerge /ndebug "
+    dependencies.each do |dep|
+        dirname = File.dirname(dep)
+        cmd += "\"/lib:#{GT::path_to_windows(dirname)}\" "
+    end
+
+    cmd += "\"/out:#{GT::path_to_windows(basedll)}\" "
+
+    cmd += "\"#{GT::path_to_windows(basedll2)}\" "
+
+    sourcedlls.each do |src|
+        cmd += "\"#{GT::path_to_windows(src)}\" "
+    end
+
+    puts cmd
+    system cmd
+
+    sourcedlls.each do |src|
+        #puts "unlink #{src}"
+        File.unlink(src)
+    end
+
+    File.unlink(basedll2)
+end
+
 #
 # Compile bundles
 #
@@ -290,6 +322,11 @@ unless BUNDLES.nil? or BUNDLES.empty?
                     File.unlink(file)
                     File.unlink(meta_file_of(file))
                 end
+            end
+
+            unless entries[:merge].nil? or entries[:merge].size == 0
+                puts "    Merging with " + entries[:merge]
+                merge(output, resolve_references(as_array(entries[:merge])), references)
             end
 
             puts "    Done"
