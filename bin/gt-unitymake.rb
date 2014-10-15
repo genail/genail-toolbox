@@ -68,9 +68,9 @@ def matches(file, pattern, simple=false)
     pattern =~ file
 end
 
-def resolve_files(file)
+def resolve_files(file, ignore)
     if file.is_a? Array
-        out = file.map { |f| resolve_files(f) }
+        out = file.map { |f| resolve_files(f, ignore) }
         return out.flatten
     end
 
@@ -87,9 +87,15 @@ def resolve_files(file)
 
     list = list_dir(base)
 
-    list.select do |el|
+    list = list.select do |el|
         matches(el, file)
     end
+
+    list = list.reject do |el|
+        ignore.include? el
+    end
+
+    list
 end
 
 def list_dir(dir)
@@ -197,7 +203,7 @@ end
 
 def namespace_of(file)
     contents = File.read(file)
-    md = /namespace ([^ {\^]+)/.match(contents)
+    md = /^[ \t]*namespace ([^ {\^]+)/.match(contents)
     unless md.nil?
         md[1]
     else
@@ -222,7 +228,8 @@ unless BUNDLES.nil? or BUNDLES.empty?
             output = entries[:output]
             puts "    Copying files"
             files = as_array(entries[:files])
-            srcfiles = resolve_files(files)
+            ignore = as_array(entries[:ignore])
+            srcfiles = resolve_files(files, ignore)
             files = copy_files(srcfiles, tempdir)
 
             puts "    Connecting dependencies"
@@ -265,12 +272,13 @@ unless BUNDLES.nil? or BUNDLES.empty?
                     file_class_name = class_name_of(file)
                     file_namespace = namespace_of(file)
 
-                    puts "#{file_namespace}.#{file_class_name}"
+                    #puts "#{file_namespace}.#{file_class_name}"
 
                     dll_guid = entries[:guid] || GT.gt-genguid()
                     dll_fileid = GT.fileid(file_class_name, file_namespace)
 
-                    GT.update_references(entries[:rootdir], file_guid, dll_guid, 11500000, dll_fileid)
+                    rootdir = entries[:rootdir] || "Assets"
+                    GT.update_references(rootdir, file_guid, dll_guid, 11500000, dll_fileid)
                 end
                 
             end
